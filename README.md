@@ -7,3 +7,9 @@ The code is slightly altered with
 1. I add `DataSet` and `DataLoader` classes, so I don't have too many global vars laying around
 1. no GPU at all (device is cpu only): the mac I have at the moment has no GPU, which forces me to think carefully about optimizing intead of just scaling up the net
 1. my own comments, for personal reference
+
+
+# files
+Structure is just like the one from AK
+1. `module.py` has all the module definitions
+1. `train.py` has the data gathering, object instantiations and training loop
