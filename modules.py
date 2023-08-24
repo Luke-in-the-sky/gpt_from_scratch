@@ -41,6 +41,8 @@ class Hyperparams:
     # trainin params
     learning_rate: float = 1e-3
     training_steps: int = 5000
+    # others
+    vocab_size: int = None
 
 
 @dataclass
@@ -234,41 +236,39 @@ class TransformerBlock(torch.nn.Module):
 
 @dataclass(eq=False)
 class MyGPT(torch.nn.Module):
-    vocab_size: int
-    block_size: int
-    embedding_dim: int
-    num_transf_blocks: int
-    num_heads: int = 4
-    dropout_rate: int = 0
+    hypers: Hyperparams
 
     def __post_init__(self):  # `post_init` is the pattern for `@dataclass`
         super().__init__()
 
+        # checks
+        assert self.hypers.vocab_size > 0, "No vocab_size set"
+
         # embeddings
         self.token_emb = Embedding(
-            self.vocab_size, self.embedding_dim
+            self.hypers.vocab_size, self.hypers.embedding_dim
         )  # out.shape = (B, T, C)
         self.pos_emb = Embedding(
-            self.block_size, self.embedding_dim
+            self.hypers.block_size, self.hypers.embedding_dim
         )  # out.shape = (B, T, C)
 
         # transformer
         self.blocks = Sequential(
             *[
                 TransformerBlock(
-                    emb_dim=self.embedding_dim,
-                    num_heads=self.num_heads,
-                    dropout_rate=self.dropout_rate,
+                    emb_dim=self.hypers.embedding_dim,
+                    num_heads=self.hypers.num_heads,
+                    dropout_rate=self.hypers.dropout_rate,
                 )
-                for _ in range(self.num_transf_blocks)
+                for _ in range(self.hypers.num_transf_blocks)
             ]
         )  # out.shape = (B, T, C)
         self.layer_norm = LayerNorm(
-            self.embedding_dim
+            self.hypers.embedding_dim
         )  # because the out of TransformerBlock is not normalized
 
         # final for softmax
-        self.lm_head = Linear(self.embedding_dim, self.vocab_size)
+        self.lm_head = Linear(self.hypers.embedding_dim, self.hypers.vocab_size)
 
     def forward(self, ix, targets=None):
         B, T = ix.shape
@@ -303,7 +303,7 @@ class MyGPT(torch.nn.Module):
 
         for i in range(max_new_tokens):
             # ensure context is not longer than block_size
-            idx = idx[:, -self.block_size :]
+            idx = idx[:, -self.hypers.block_size :]
 
             # get logits, pick only the last one in T dimension (we use max context available for generaiton)
             logits, loss = self(idx)  # logits.shape = (B, T, vocab_size)

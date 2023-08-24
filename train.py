@@ -1,7 +1,8 @@
 from modules import *
 
+debugging = True
+
 debugging = Hyperparams(
-    # input dimensions
     block_size=16,
     batch_size=16,
     embedding_dim=2**3 * 3,
@@ -12,6 +13,8 @@ debugging = Hyperparams(
     # trainin params
     learning_rate=4e-4,
     training_steps=500,
+    # others
+    vocab_size=None,  # will compute this later
 )
 
 performing = Hyperparams(
@@ -26,6 +29,8 @@ performing = Hyperparams(
     # trainin params
     learning_rate=4e-4,
     training_steps=500,
+    # others
+    vocab_size=None,  # will compute this later
 )
 
 hpars = debugging
@@ -44,8 +49,8 @@ with open("input.txt", "r") as f:
 
 # set up vocab
 chars = sorted(list(set(text)))
-vocab_size = len(chars)
-print(f"{vocab_size=}")
+hpars.vocab_size = len(chars)
+print(f"{hpars.vocab_size=}")
 
 c2i = {c: i for i, c in enumerate(chars)}
 i2c = {i: c for c, i in c2i.items()}
@@ -72,20 +77,14 @@ loader = DataLoader(
 # instantiate model
 # ----------
 
-m = MyGPT(
-    vocab_size,
-    block_size=hpars.block_size,
-    embedding_dim=hpars.embedding_dim,
-    num_transf_blocks=hpars.num_transf_blocks,
-    num_heads=hpars.num_heads,
-    dropout_rate=hpars.dropout_rate * 2,
-)
-xb_debug, yb_debug = loader.get_batch(split="train")
-logits, loss = m(xb_debug, yb_debug)
-print(f"{xb_debug.shape=}")
-print(f"{logits.shape=}")
-evaled_loss = evaluate_loss(m, loader, num_evals=10)
-print(f"{evaled_loss=}")
+m = MyGPT(hypers=hpars)
+if debugging:
+    xb_debug, yb_debug = loader.get_batch(split="train")
+    logits, loss = m(xb_debug, yb_debug)
+    print(f"{xb_debug.shape=}")
+    print(f"{logits.shape=}")
+    evaled_loss = evaluate_loss(m, loader, num_evals=10)
+    print(f"{evaled_loss=}")
 
 
 # create optimizer
