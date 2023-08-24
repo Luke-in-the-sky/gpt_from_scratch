@@ -15,7 +15,7 @@ import os
 import requests
 import numpy as np
 import torch
-from typing import Literal
+from typing import Literal, Callable, Iterable
 
 
 # Helpers
@@ -30,21 +30,58 @@ def download_data(destination_file: str = "input.txt"):
 class Hyperparams:
     """just a holder for the hyperparams"""
 
+    # input dimensions
     block_size: int = 16
     batch_size: int = 64
     embedding_dim: int = 2**5 * 3
+    # transformer params
     num_transf_blocks: int = 1
     num_heads: int = 6
     dropout_rate: int = 0.2
+    # trainin params
     learning_rate: float = 1e-3
+    training_steps: int = 5000
 
 
-def get_batch(split: Literal["train", "val"], hypers: Hyperparams):
-    segment = train_data if split == "train" else val_data
-    ix = torch.randint(len(segment) - hypers.block_size, (hypers.batch_size,))
-    x = torch.stack([segment[i : i + hypers.block_size] for i in ix])
-    y = torch.stack([segment[i + 1 : i + 1 + hypers.block_size] for i in ix])
-    return x, y
+@dataclass
+class DataSet:
+    train: Iterable
+    validation: Iterable
+
+
+@dataclass
+class DataLoader:
+    block_size: int
+    batch_size: int
+    data: DataSet
+
+    def get_batch(self, split: Literal["train", "val"]):
+        segment = self.data.train if split == "train" else self.data.validation
+        ix = torch.randint(len(segment) - self.block_size, (self.batch_size,))
+        x = torch.stack([segment[i : i + self.block_size] for i in ix])
+        y = torch.stack([segment[i + 1 : i + 1 + self.block_size] for i in ix])
+        return x, y
+
+
+@torch.no_grad()
+def evaluate_loss(model: torch.nn.Module, loader: DataLoader, num_evals: int = 100):
+    """
+    uses `loader.get_batch` to grab a batch from each of train and test (`num_evals` times)
+    and calls `model` on the batches to get the loss
+
+    returns a dict of list of loss values
+    """
+    model.eval()
+    out = {}
+    for split in ["train", "validation"]:
+        losses = [
+            # `model()` returns the tuple `(logits, loss)`
+            model(*loader.get_batch(split))[1]
+            for i in range(num_evals)
+        ]
+        out[split] = torch.tensor(losses).mean()
+    model.train()
+    return out
 
 
 # Modules

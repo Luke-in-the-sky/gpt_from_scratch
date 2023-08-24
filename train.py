@@ -1,14 +1,34 @@
 from modules import *
 
-hpars = Hyperparams(
+debugging = Hyperparams(
+    # input dimensions
+    block_size=16,
+    batch_size=16,
+    embedding_dim=2**3 * 3,
+    # transformer params
+    num_transf_blocks=1,
+    num_heads=3,
+    dropout_rate=0.2,
+    # trainin params
+    learning_rate=4e-4,
+    training_steps=500,
+)
+
+performing = Hyperparams(
+    # input dimensions
     block_size=16,
     batch_size=64,
-    embedding_dim=2**6 * 6,
-    num_transf_blocks=2,
-    num_heads=6,
+    embedding_dim=2**6 * 3,
+    # transformer params
+    num_transf_blocks=1,
+    num_heads=3,
     dropout_rate=0.2,
+    # trainin params
     learning_rate=4e-4,
+    training_steps=500,
 )
+
+hpars = debugging
 
 # ----------
 # Tokenize and load datasets
@@ -35,11 +55,18 @@ decode = lambda d: "".join([i2c[i] for i in d])
 # tokenize and encode the text
 data = torch.tensor(encode(text), dtype=torch.long)
 
-# train, eval, test (no shuffle)
+# create dataset and dataloader
 n = int(len(data) * 0.9)
-train_data = data[:n]
-val_data = data[n:]
+dataset = DataSet(
+    train=data[:n],
+    validation=data[n:],
+)
 
+loader = DataLoader(
+    batch_size=hpars.batch_size,
+    block_size=hpars.block_size,
+    data=dataset,
+)
 
 # ----------
 # instantiate model
@@ -53,9 +80,33 @@ m = MyGPT(
     num_heads=hpars.num_heads,
     dropout_rate=hpars.dropout_rate * 2,
 )
-logits, loss = m(xb, yb)
-print(f"{xb.shape=}")
+xb_debug, yb_debug = loader.get_batch(split="train")
+logits, loss = m(xb_debug, yb_debug)
+print(f"{xb_debug.shape=}")
 print(f"{logits.shape=}")
+evaled_loss = evaluate_loss(m, loader, num_evals=10)
+print(f"{evaled_loss=}")
+
 
 # create optimizer
 optim = torch.optim.AdamW(m.parameters(), hpars.learning_rate)
+
+# allocate tracker for losses
+losses = []
+
+# train
+for i in range(hpars.training_steps):
+    # forward
+    xb, yb = loader.get_batch(split="train")
+
+    # compute loss
+    logits, loss = m(xb, targets=yb)
+    if i % 100 == 0:
+        out = evaluate_loss(m, loader)
+        print(f"{i}/{hpars.training_steps} {out=}")
+        losses.append(out)
+
+    # back
+    optim.zero_grad(set_to_none=True)
+    loss.backward()
+    optim.step()
