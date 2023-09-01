@@ -4,8 +4,8 @@ import logging
 debugging = True
 
 debugging = Hyperparams(
-    block_size=16,
-    batch_size=16,
+    block_size=8,
+    batch_size=4,
     embedding_dim=2**3 * 3,
     # transformer params
     num_transf_blocks=1,
@@ -90,6 +90,7 @@ loader = DataLoader(
 m = MyGPT(hypers=hpars)
 logging.info(f'Model size: {sum([p.numel() for p in m.parameters()])}')
 if debugging:
+    print(m)
     xb_debug, yb_debug = loader.get_batch(split="train")
     logits, loss = m(xb_debug, yb_debug)
     logger.debug(f"{xb_debug.shape=}")
